@@ -469,21 +469,25 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case 0x50:
 		{
 			ToggleStopWatch();
+			InvalidateRect(hMainWindow, nullptr, true);
 		}
 		break;
 		case VK_F8:
 		{
 			ResetStopWatch();
+			InvalidateRect(hMainWindow, nullptr, true);
 		}
 		break;
 		case 0x4C:
 		{
 			Split();
+			InvalidateRect(hMainWindow, nullptr, true);
 		}
 		break;
 		case VK_F5:
 		{
 			resetSplits();
+			InvalidateRect(hMainWindow, nullptr, true);
 		}
 		break;
 		}
