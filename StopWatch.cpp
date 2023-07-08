@@ -20,6 +20,7 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    SetHotKey(HWND, UINT, WPARAM, LPARAM);
 
 struct SavedState
 {
@@ -29,16 +30,21 @@ struct SavedState
 	std::chrono::duration<double> Splits[4];
 	UINT intervalValue;
 	BOOL b_StartedState;
-	BOOL b_Sound;
+	BOOL b_Sound = true;
 };
 
 SavedState LoadFromFile();
 void SavetoFile(SavedState ss);
 
 int g_window_width = 500;
-int g_window_height = 300;
+int g_window_height = 280;
 int buttonWidth = 120;
 int buttonheight = 50;
+
+float sixthx = g_window_width / 6.0f;
+int x1 = int(sixthx - buttonWidth / 2.0f);
+int x2 = int(sixthx * 3 - buttonWidth / 2.0f);
+int x3 = int(sixthx * 5 - buttonWidth / 2.0f);
 
 HWND hMainWindow = nullptr;
 HWND hwndStartButton = nullptr;
@@ -51,9 +57,7 @@ std::wstring TimerString = L"";
 std::wstring SplitStrings[4];
 
 HFONT myfont1 = nullptr;
-HFONT splitfonts[4] = {};
-
-std::chrono::milliseconds g_ms = {};
+HFONT splitfont = {};
 
 SavedState state = LoadFromFile();
 
@@ -65,11 +69,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
-	// TODO: Place code here.
-
 	// Initialize global strings
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-	LoadStringW(hInstance, IDC_THELONGDARKGAMETIMESTOPWATCH, szWindowClass, MAX_LOADSTRING);
+	LoadStringW(hInstance, IDC_THELONGDARKSTOPWATCH, szWindowClass, MAX_LOADSTRING);
 	MyRegisterClass(hInstance);
 
 	// Perform application initialization:
@@ -78,7 +80,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 	}
 
-	HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_THELONGDARKGAMETIMESTOPWATCH));
+	HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_THELONGDARKSTOPWATCH));
 
 	MSG msg;
 
@@ -95,12 +97,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	return (int)msg.wParam;
 }
 
-
-//
-//  FUNCTION: MyRegisterClass()
-//
-//  PURPOSE: Registers the window class.
-//
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
 	WNDCLASSEXW wcex = {};
@@ -112,26 +108,15 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = 0;
 	wcex.hInstance = hInstance;
-	wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_THELONGDARKGAMETIMESTOPWATCH));
+	wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_THELONGDARKSTOPWATCH));
 	wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-	wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_THELONGDARKGAMETIMESTOPWATCH);
+	wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_THELONGDARKSTOPWATCH);
 	wcex.lpszClassName = szWindowClass;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
 	return RegisterClassExW(&wcex);
 }
-
-//
-//   FUNCTION: InitInstance(HINSTANCE, int)
-//
-//   PURPOSE: Saves instance handle and creates main window
-//
-//   COMMENTS:
-//
-//        In this function, we save the instance handle in a global variable and
-//        create and display the main program window.
-//
 
 std::wstring GetAlarmLabel()
 {
@@ -159,13 +144,10 @@ void SetFont()
 	font.lfWidth = 12;
 
 	myfont1 = CreateFontIndirectW(&font);
-	float scale[4] = { 0.75f, 0.70f, 0.60f, 0.55f };
-	for (int i = 0; i < 4; i++)
-	{
-		font.lfHeight = int(30 * scale[i]);
-		font.lfWidth = int(12 * scale[i]);
-		splitfonts[i] = CreateFontIndirectW(&font);
-	}
+	float scale = 0.75f;
+	font.lfHeight = int(30 * scale);
+	font.lfWidth = int(12 * scale);
+	splitfont = CreateFontIndirectW(&font);
 }
 
 void GetInterval()
@@ -177,91 +159,95 @@ void GetInterval()
 	ss >> state.intervalValue;
 }
 
-std::wstring GetTimeString(std::chrono::milliseconds ms)
+struct TimeFormated
 {
-	UINT64 GameMinutesTenths = ms.count() / 500;
-	UINT64 GameMinutes = GameMinutesTenths / 10;
-	static UINT64 LastGameMinutes = 0;
-	UINT tenths = (GameMinutesTenths % 10);
-	UINT minutes = (GameMinutesTenths % 600) / 10;
-	UINT hours = (UINT)(GameMinutesTenths / 600);
-
-	std::wstring wshours = L"";
-	if (hours > 0)
+	UINT tenths;
+	UINT minutes;
+	UINT hours;
+	TimeFormated(UINT64 GameMinutesTenths)
 	{
-		wshours = std::to_wstring(hours) + ((hours == 1) ? L" hour " : L" hours ");
+		tenths = (GameMinutesTenths % 10);
+		minutes = (GameMinutesTenths % 600) / 10;
+		hours = (UINT)(GameMinutesTenths / 600);
 	}
-	std::wstring wsminutues = std::to_wstring(minutes);
-	return wshours + L" " + wsminutues + L"." + std::to_wstring(tenths) + L" m                                                  ";
+};
+
+std::wstring GetTimeString(TimeFormated timeformatted)
+{
+	std::wstring wshours = L"";
+	if (timeformatted.hours > 0)
+	{
+		wshours = std::to_wstring(timeformatted.hours) + ((timeformatted.hours == 1) ? L" hour " : L" hours ");
+	}
+	std::wstring wsminutues = std::to_wstring(timeformatted.minutes);
+	return wshours + L" " + wsminutues + L"." + std::to_wstring(timeformatted.tenths) + L" m";
+}
+
+UINT64 GetTenths(std::chrono::milliseconds ms)
+{
+	return ms.count() / 500;
 }
 
 void Timerproc(HWND unnamedParam1, UINT unnamedParam2, UINT_PTR unnamedParam3, DWORD unnamedParam4)
 {
-	auto timepointnow = std::chrono::system_clock::now();
-	state.timeduration = (timepointnow - state.timebegin) + state.Previoustimeduration;
-
-	g_ms = std::chrono::duration_cast<std::chrono::milliseconds>(state.timeduration);
-
-	UINT64 GameMinutesTenths = g_ms.count() / 500;
-	UINT64 GameMinutes = GameMinutesTenths / 10;
-	static UINT64 LastGameMinutes = 0;
-	UINT tenths = (GameMinutesTenths % 10);
-	UINT minutes = (GameMinutesTenths % 600) / 10;
-	UINT hours = (UINT)(GameMinutesTenths / 600);
 	static BOOL FirstStart = true;
+	auto timepointnow = std::chrono::system_clock::now();
+	state.timeduration = (timepointnow - state.timebegin);
+
+	state.timeduration += state.Previoustimeduration;
+
+	UINT64 GameMinutesTenths = GetTenths(std::chrono::duration_cast<std::chrono::milliseconds>(state.timeduration));
+	UINT64 GameMinutes = GameMinutesTenths / 10;
+	TimeFormated timeformatted(GameMinutesTenths);
+	static UINT64 LastGameMinutes = 0;
 	if (FirstStart)
 	{
 		LastGameMinutes = GameMinutes;
 		FirstStart = false;
 	}
 
-	if (state.intervalValue > 0 && GameMinutes != 0 && GameMinutes % state.intervalValue == 0 && (GameMinutes != LastGameMinutes))
+	if (state.intervalValue > 0 && GameMinutes != 0 && GameMinutes % state.intervalValue == 0 && GameMinutes != LastGameMinutes && GameMinutesTenths % 10 == 0)
 	{
 		PlaySound(MAKEINTRESOURCE(IDSOUNDALARM), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
 		LastGameMinutes = GameMinutes;
 	}
-
-	std::wstring wshours = L"";
-	if (hours > 0)
-	{
-		wshours = std::to_wstring(hours) + ((hours == 1) ? L" hour " : L" hours ");
-	}
-	std::wstring wsminutues = std::to_wstring(minutes);
-
-	TimerString = wshours + L" " + wsminutues + L"." + std::to_wstring(tenths) + L" m                                                  ";
-
-	InvalidateRect(hMainWindow, nullptr, false);
+	TimerString = GetTimeString(timeformatted);
+	InvalidateRect(hMainWindow, nullptr, true);
 }
 
 void StartTimer()
 {
-	SetDlgItemText(hMainWindow, IDM_STARTBUTTON, L"Stop");
-
+	SetDlgItemText(hMainWindow, IDM_STARTBUTTON, L"'P' Stop");
 	//Create Timer that calls Timerproc each tenth of a second
 	SetTimer(hMainWindow,            // handle to main window 
 		IDT_TIMER1,					 // timer identifier 
 		100,						 // 0.1 second interval 
-		Timerproc);					 // no timer callback 
+		Timerproc);					 // Callback function 
 }
 
 void PauseTimer()
 {
-	SetDlgItemText(hMainWindow, IDM_STARTBUTTON, L"Start");
+	SetDlgItemText(hMainWindow, IDM_STARTBUTTON, L"'P' Start");
 	state.Previoustimeduration = state.timeduration;
-	//Stops Timer
 	KillTimer(hMainWindow, IDT_TIMER1);
 }
 
 void Split()
 {
-	state.Splits[3] = state.Splits[2];
-	state.Splits[2] = state.Splits[1];
-	state.Splits[1] = state.Splits[0];
-	state.Splits[0] = g_ms;
-	SplitStrings[3] = SplitStrings[2];
-	SplitStrings[2] = SplitStrings[1];
-	SplitStrings[1] = SplitStrings[0];
-	SplitStrings[0] = TimerString;
+	if (state.Splits[0] != state.timeduration)
+	{
+		state.Splits[3] = state.Splits[2];
+		state.Splits[2] = state.Splits[1];
+		state.Splits[1] = state.Splits[0];
+		state.Splits[0] = state.timeduration;
+		SplitStrings[3] = SplitStrings[2];
+		SplitStrings[2] = SplitStrings[1];
+		SplitStrings[1] = SplitStrings[0];
+		SplitStrings[0] = TimerString;
+		InvalidateRect(hMainWindow, nullptr, true);
+		if (state.b_Sound)
+			PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK2), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+	}
 }
 
 void resetSplits()
@@ -272,7 +258,21 @@ void resetSplits()
 	state.Splits[0] = {};
 	for (int i = 0; i < 4; i++)
 	{
-		SplitStrings[i] = GetTimeString(std::chrono::duration_cast<std::chrono::milliseconds>(state.Splits[i]));
+		SplitStrings[i] = GetTimeString(GetTenths({}));
+	}
+	if (state.b_Sound)
+		PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK3), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+}
+
+void ToggleSound(HWND wnd)
+{
+	if (state.b_Sound)
+	{
+		ModifyMenuW(GetMenu(wnd), IDM_SOUNDTOGGLE, MF_BYCOMMAND | MF_CHECKED, IDM_SOUNDTOGGLE, L"&Enabled");
+	}
+	else
+	{
+		ModifyMenuW(GetMenu(wnd), IDM_SOUNDTOGGLE, MF_BYCOMMAND | MF_UNCHECKED, IDM_SOUNDTOGGLE, L"&Enabled");
 	}
 }
 
@@ -281,8 +281,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	SetFont();
 	hInst = hInstance; // Store instance handle in our global variable
 
-	hMainWindow = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME,
-		CW_USEDEFAULT, 0, g_window_width, g_window_height, nullptr, nullptr, hInstance, nullptr);
+	hMainWindow = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX,
+		CW_USEDEFAULT, 0, g_window_width + 19, g_window_height, nullptr, nullptr, hInstance, nullptr);
 
 	if (!hMainWindow)
 	{
@@ -293,13 +293,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	UpdateWindow(hMainWindow);
 
 	// Create Buttons
-	float sixthx = g_window_width / 6.0f;
-	int x1 = int(sixthx - buttonWidth / 2.0f);
-	int x2 = int(sixthx * 3 - buttonWidth / 2.0f);
-	int x3 = int(sixthx * 5 - buttonWidth / 2.0f);
+
 	hwndStartButton = CreateWindowW(
 		L"BUTTON",  // Predefined class; Unicode assumed 
-		L"Start",      // Button text 
+		L"'P' Start",      // Button text 
 		WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
 		x1,         // x position 
 		100,         // y position 
@@ -312,7 +309,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	hwndResetButton = CreateWindowW(
 		L"BUTTON",  // Predefined class; Unicode assumed 
-		L"Reset",      // Button text 
+		L"'F8' Reset",      // Button text 
 		WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
 		x2,         // x position 
 		100,         // y position 
@@ -325,7 +322,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	hwndSplitButton = CreateWindowW(
 		L"BUTTON",  // Predefined class; Unicode assumed 
-		L"Split",      // Button text 
+		L"'L' Split",      // Button text 
 		WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
 		x3,         // x position 
 		100,         // y position 
@@ -356,10 +353,38 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	for (int i = 0; i < 4; i++)
 	{
-		SplitStrings[i] = GetTimeString(std::chrono::duration_cast<std::chrono::milliseconds>(state.Splits[i]));
+		SplitStrings[i] = GetTimeString(GetTenths(std::chrono::duration_cast<std::chrono::milliseconds>(state.Splits[i])));
 	}
-
+	ToggleSound(hMainWindow);
 	return TRUE;
+}
+
+void ToggleStopWatch()
+{
+	state.b_StartedState = !state.b_StartedState;
+	if (state.b_StartedState)
+	{
+		state.timebegin = std::chrono::system_clock::now();
+		StartTimer();
+		if (state.b_Sound)
+			PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK0), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+	}
+	else
+	{
+		PauseTimer();
+		if (state.b_Sound)
+			PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK1), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+	}
+}
+
+void ResetStopWatch()
+{
+	state.timebegin = std::chrono::system_clock::now();
+	state.Previoustimeduration = {};
+	TimerString = GetTimeString(TimeFormated({}));
+	InvalidateRect(hMainWindow, nullptr, true);
+	if (state.b_Sound)
+		PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK4), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -369,53 +394,40 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_COMMAND:
 	{
 		int wmId = LOWORD(wParam);
-		// Parse the menu selections:
 		switch (wmId)
 		{
 		case IDM_ABOUT:
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
+		case IDM_SOUNDTOGGLE:
+			state.b_Sound = !state.b_Sound;
+			if (state.b_Sound)
+			{
+				PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK1), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+			}
+			ToggleSound(hMainWindow);
+			break;
 		case IDM_EXIT:
 			DestroyWindow(hWnd);
 			break;
 		case IDM_STARTBUTTON:
-			state.b_StartedState = !state.b_StartedState;
-			if (state.b_StartedState)
-			{
-				state.timebegin = std::chrono::system_clock::now();
-				StartTimer();
-			}
-			else
-			{
-				PauseTimer();
-			}
+			SetFocus(hMainWindow);
+			ToggleStopWatch();
 			break;
 		case IDM_RESETBUTTON:
-			PauseTimer();
-			resetSplits();
-			state.timebegin = std::chrono::system_clock::now();
-			state.Previoustimeduration = {};
-			TimerString = L"                                                 ";
-			state.b_StartedState = false;
-			SetDlgItemText(hWnd, IDM_STARTBUTTON, L"Start");
-			Timerproc(0, 0, 0, 0);
+			SetFocus(hMainWindow);
+			ResetStopWatch();
 			break;
 		case IDM_SNAPSHOTBUTTON:
 		{
-			if (state.b_StartedState)
-			{
-				Split();
-
-			}
-			else
-			{
-				PlaySound(MAKEINTRESOURCE(IDSOUNDERROR), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
-			}
-
-
-			//std::wstring beepstring;
-			//beepstring = L"Snap Shot";
-			//SetDlgItemText(hWnd, IDC_STATICBOX, beepstring.c_str());
+			SetFocus(hMainWindow);
+			Split();
+		}
+		break;
+		case IDM_SPLITRESET:
+		{
+			resetSplits();
+			InvalidateRect(hMainWindow, nullptr, true);
 		}
 		break;
 		case IDC_INTERVALBOX:
@@ -434,34 +446,55 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(hWnd, &ps);
-		// TODO: Add any drawing code that uses hdc here...
 		SelectObject(hdc, myfont1);
 		TextOutW(hdc, 35, 36, TimerString.c_str(), (int)TimerString.size());
 		for (int i = 0; i < 4; i++)
 		{
-			SelectObject(hdc, splitfonts[i]);
-			TextOutW(hdc, g_window_width / 2 + 35 + i * 4, 76 - i * 22, SplitStrings[i].c_str(), (int)SplitStrings[i].size());
+			SelectObject(hdc, splitfont);
+			TextOutW(hdc, x2 + buttonWidth, 10 + i * 22, SplitStrings[i].c_str(), (int)SplitStrings[i].size());
 		}
 		EndPaint(hWnd, &ps);
 	}
 	break;
 	case WM_DESTROY:
-		PauseTimer();
 		SavetoFile(state);
 		DeleteObject(myfont1);
-		for (int i = 0; i < 4; i++)
-		{
-			DeleteObject(splitfonts[i]);
-		}
+		DeleteObject(splitfont);
 		PostQuitMessage(0);
 		break;
+	case WM_KEYDOWN:
+	{
+		switch (wParam)
+		{
+		case 0x50:
+		{
+			ToggleStopWatch();
+		}
+		break;
+		case VK_F8:
+		{
+			ResetStopWatch();
+		}
+		break;
+		case 0x4C:
+		{
+			Split();
+		}
+		break;
+		case VK_F5:
+		{
+			resetSplits();
+		}
+		break;
+		}
+	}
+	break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
 }
 
-// Message handler for about box.
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
@@ -480,6 +513,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	return (INT_PTR)FALSE;
 }
+
 
 SavedState LoadFromFile()
 {
