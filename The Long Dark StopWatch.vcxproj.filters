@@ -24,17 +24,17 @@
     <ClInclude Include="Resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="The Long Dark Game Time StopWatch.h">
+    <ClInclude Include="StopWatch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="The Long Dark Game Time StopWatch.cpp">
+    <ClCompile Include="StopWatch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="The Long Dark Game Time StopWatch.rc">
+    <ResourceCompile Include="The Long Dark StopWatch.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
@@ -42,8 +42,30 @@
     <Image Include="small.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="The Long Dark Game Time StopWatch.ico">
+    <Image Include="The Long Dark StopWatch.ico">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="coffee.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="small_coffee.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="sound1.bin">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="sound2.bin">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="alarm.wav">
+      <Filter>Resource Files</Filter>
+    </Media>
+    <Media Include="error.wav">
+      <Filter>Resource Files</Filter>
+    </Media>
   </ItemGroup>
 </Project>
