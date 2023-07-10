@@ -29,6 +29,9 @@ struct SavedState
 	std::chrono::duration<double> Previoustimeduration;
 	std::chrono::duration<double> Splits[4];
 	UINT intervalValue;
+	UINT AddedTime;
+	float addminutes;
+	float addhours;
 	BOOL b_StartedState;
 	BOOL b_Sound = true;
 };
@@ -37,7 +40,7 @@ SavedState LoadFromFile();
 void SavetoFile(SavedState ss);
 
 int g_window_width = 500;
-int g_window_height = 280;
+int g_window_height = 330;
 int buttonWidth = 120;
 int buttonheight = 50;
 
@@ -52,6 +55,12 @@ HWND hwndResetButton = nullptr;
 HWND hwndSplitButton = nullptr;
 HWND hwndInterval = nullptr;
 HWND hWndLabel1 = nullptr;
+
+HWND hWndAddminutesButton = nullptr;
+HWND hWndAddHoursButton = nullptr;
+
+HWND hWndAddminutes = nullptr;
+HWND hWndAddHours = nullptr;
 
 std::wstring TimerString = L"";
 std::wstring SplitStrings[4];
@@ -150,6 +159,15 @@ void SetFont()
 	splitfont = CreateFontIndirectW(&font);
 }
 
+std::wstring StripZeroes(float value)
+{
+	std::wstringstream ss;
+	ss << value;
+	std::wstring str;
+	ss >> str;
+	return str;
+}
+
 void GetInterval()
 {
 	std::wstringstream ss;
@@ -194,9 +212,13 @@ void Timerproc(HWND unnamedParam1, UINT unnamedParam2, UINT_PTR unnamedParam3, D
 	auto timepointnow = std::chrono::system_clock::now();
 	state.timeduration = (timepointnow - state.timebegin);
 
+	if (!state.b_StartedState)
+	{
+		state.timeduration = {};
+	}
 	state.timeduration += state.Previoustimeduration;
 
-	UINT64 GameMinutesTenths = GetTenths(std::chrono::duration_cast<std::chrono::milliseconds>(state.timeduration));
+	UINT64 GameMinutesTenths = GetTenths(std::chrono::duration_cast<std::chrono::milliseconds>(state.timeduration)) + state.AddedTime;
 	UINT64 GameMinutes = GameMinutesTenths / 10;
 	TimeFormated timeformatted(GameMinutesTenths);
 	static UINT64 LastGameMinutes = 0;
@@ -334,12 +356,49 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		NULL);      // Pointer not needed.
 
 	hwndInterval = CreateWindowEx(WS_EX_CLIENTEDGE, L"Edit", std::to_wstring(state.intervalValue).c_str(),
-		WS_CHILD | WS_VISIBLE, x1, 155, 35,
+		WS_CHILD | WS_VISIBLE, x1, 170, 35,
 		20, hMainWindow, (HMENU)IDC_INTERVALBOX, NULL, NULL);
 
 	hWndLabel1 = CreateWindowEx(0, L"static", GetAlarmLabel().c_str(),
-		WS_CHILD | WS_VISIBLE, x1, 185, 180,
+		WS_CHILD | WS_VISIBLE, x1, 200, 150,
 		20, hMainWindow, (HMENU)IDC_STATICBOX, NULL, NULL);
+
+
+	//Add minutes
+	hWndAddminutes = CreateWindowEx(WS_EX_CLIENTEDGE, L"Edit", StripZeroes(state.addminutes).c_str(),
+		WS_CHILD | WS_VISIBLE, x2, 170, 100,
+		20, hMainWindow, (HMENU)IDC_MINUTEBOX, NULL, NULL);
+
+	hwndSplitButton = CreateWindowW(
+		L"BUTTON",  // Predefined class; Unicode assumed 
+		L"Add Minutes",      // Button text 
+		WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
+		x2,         // x position 
+		200,         // y position 
+		buttonWidth,        // Button width
+		buttonheight,        // Button height
+		hMainWindow,     // Parent window
+		(HMENU)IDM_ADDMINUTEBUTTON,       // menu ID.
+		(HINSTANCE)GetWindowLongPtr(hMainWindow, GWLP_HINSTANCE),
+		NULL);      // Pointer not needed.
+
+	//Add hours
+	hWndAddHours = CreateWindowEx(WS_EX_CLIENTEDGE, L"Edit", StripZeroes(state.addhours).c_str(),
+		WS_CHILD | WS_VISIBLE, x3, 170, 100,
+		20, hMainWindow, (HMENU)IDC_HOURBOX, NULL, NULL);
+
+	hwndSplitButton = CreateWindowW(
+		L"BUTTON",  // Predefined class; Unicode assumed 
+		L"Add Hours",      // Button text 
+		WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
+		x3,         // x position 
+		200,         // y position 
+		buttonWidth,        // Button width
+		buttonheight,        // Button height
+		hMainWindow,     // Parent window
+		(HMENU)IDM_ADDHOURBUTTON,       // menu ID.
+		(HINSTANCE)GetWindowLongPtr(hMainWindow, GWLP_HINSTANCE),
+		NULL);      // Pointer not needed.
 
 	if (state.b_StartedState)
 	{
@@ -379,6 +438,7 @@ void ToggleStopWatch()
 
 void ResetStopWatch()
 {
+	state.AddedTime = {};
 	state.timebegin = std::chrono::system_clock::now();
 	state.Previoustimeduration = {};
 	TimerString = GetTimeString(TimeFormated({}));
@@ -435,6 +495,42 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				GetInterval();
 				SetDlgItemText(hWnd, IDC_STATICBOX, GetAlarmLabel().c_str());
+			}
+			break;
+		case IDM_ADDMINUTEBUTTON:
+		{
+			state.AddedTime += UINT(state.addminutes * 10);
+			Timerproc(0, 0, 0, 0);
+			if (state.b_Sound)
+				PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK2), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+		}
+		break;
+		case IDM_ADDHOURBUTTON:
+		{
+			state.AddedTime += UINT(state.addhours * 600);
+			Timerproc(0, 0, 0, 0);
+			if (state.b_Sound)
+				PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK3), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+		}
+		break;
+		case IDC_MINUTEBOX:
+			if (HIWORD(wParam) == EN_CHANGE)
+			{
+				std::wstringstream ss;
+				WCHAR windowtext[64] = {};
+				GetWindowText(hWndAddminutes, windowtext, 64);
+				ss << windowtext;
+				ss >> state.addminutes;
+			}
+			break;
+		case IDC_HOURBOX:
+			if (HIWORD(wParam) == EN_CHANGE)
+			{
+				std::wstringstream ss;
+				WCHAR windowtext[64] = {};
+				GetWindowText(hWndAddHours, windowtext, 64);
+				ss << windowtext;
+				ss >> state.addhours;
 			}
 			break;
 		default:

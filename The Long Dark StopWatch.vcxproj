@@ -154,7 +154,6 @@
   </ItemGroup>
   <ItemGroup>
     <Media Include="alarm.wav" />
-    <Media Include="error.wav" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

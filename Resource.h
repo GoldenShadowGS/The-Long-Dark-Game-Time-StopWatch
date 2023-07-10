@@ -33,6 +33,10 @@
 #define IDM_HOTKEYRESET                 204
 #define IDM_HOTKEYSPLIT                 205
 #define IDM_HOTKEYSPLITRESET            206
+#define IDM_ADDMINUTEBUTTON             210
+#define IDM_ADDHOURBUTTON               211
+#define IDC_MINUTEBOX                   212
+#define IDC_HOURBOX                     213
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
