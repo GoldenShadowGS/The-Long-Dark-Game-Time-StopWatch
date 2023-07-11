@@ -7,6 +7,7 @@
 #include <sstream>
 #include <chrono>
 #include <fstream>
+#include <assert.h>
 
 #define MAX_LOADSTRING 100
 
@@ -27,7 +28,7 @@ struct SavedState
 	std::chrono::time_point<std::chrono::system_clock> timebegin;
 	std::chrono::duration<double> timeduration;;
 	std::chrono::duration<double> Previoustimeduration;
-	std::chrono::duration<double> Splits[4];
+	UINT64 SplitsTenths[4];
 	UINT intervalValue;
 	UINT AddedTime;
 	float addminutes;
@@ -35,7 +36,8 @@ struct SavedState
 	BOOL b_StartedState;
 	BOOL b_Sound = true;
 };
-
+UINT64 GameMinutesTenths = {};
+UINT64 TimeSinceLastSplit = {};
 SavedState LoadFromFile();
 void SavetoFile(SavedState ss);
 
@@ -62,7 +64,8 @@ HWND hWndAddHoursButton = nullptr;
 HWND hWndAddminutes = nullptr;
 HWND hWndAddHours = nullptr;
 
-std::wstring TimerString = L"";
+std::wstring TimerString;
+std::wstring TimeSinceLastSplitString;
 std::wstring SplitStrings[4];
 
 HFONT myfont1 = nullptr;
@@ -208,7 +211,6 @@ UINT64 GetTenths(std::chrono::milliseconds ms)
 
 void Timerproc(HWND unnamedParam1, UINT unnamedParam2, UINT_PTR unnamedParam3, DWORD unnamedParam4)
 {
-	static BOOL FirstStart = true;
 	auto timepointnow = std::chrono::system_clock::now();
 	state.timeduration = (timepointnow - state.timebegin);
 
@@ -218,21 +220,25 @@ void Timerproc(HWND unnamedParam1, UINT unnamedParam2, UINT_PTR unnamedParam3, D
 	}
 	state.timeduration += state.Previoustimeduration;
 
-	UINT64 GameMinutesTenths = GetTenths(std::chrono::duration_cast<std::chrono::milliseconds>(state.timeduration)) + state.AddedTime;
+	GameMinutesTenths = GetTenths(std::chrono::duration_cast<std::chrono::milliseconds>(state.timeduration)) + state.AddedTime;
+	//assert(GameMinutesTenths >= state.SplitsTenths[0]);
+	TimeSinceLastSplit = GameMinutesTenths - state.SplitsTenths[0];
+	if (TimeSinceLastSplit == 10)
+	{
+		TimeSinceLastSplit = 10;
+	}
+	UINT64 TimeSinceLastSplitMinutes = TimeSinceLastSplit / 10;
 	UINT64 GameMinutes = GameMinutesTenths / 10;
 	TimeFormated timeformatted(GameMinutesTenths);
-	static UINT64 LastGameMinutes = 0;
-	if (FirstStart)
-	{
-		LastGameMinutes = GameMinutes;
-		FirstStart = false;
-	}
+	TimeFormated timeformattedLastSplit(TimeSinceLastSplit);
+	static UINT64 LastGameMinutes = TimeSinceLastSplitMinutes;
 
-	if (state.intervalValue > 0 && GameMinutes != 0 && GameMinutes % state.intervalValue == 0 && GameMinutes != LastGameMinutes && GameMinutesTenths % 10 == 0)
+	if (state.intervalValue > 0 && TimeSinceLastSplitMinutes != 0 && TimeSinceLastSplitMinutes % state.intervalValue == 0 && TimeSinceLastSplitMinutes != LastGameMinutes && TimeSinceLastSplit % 10 == 0)
 	{
 		PlaySound(MAKEINTRESOURCE(IDSOUNDALARM), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
-		LastGameMinutes = GameMinutes;
+		LastGameMinutes = TimeSinceLastSplitMinutes;
 	}
+	TimeSinceLastSplitString = GetTimeString(timeformattedLastSplit);
 	TimerString = GetTimeString(timeformatted);
 	InvalidateRect(hMainWindow, nullptr, true);
 }
@@ -256,17 +262,17 @@ void PauseTimer()
 
 void Split()
 {
-	if (state.Splits[0] != state.timeduration)
+	if (state.SplitsTenths[0] != GameMinutesTenths)
 	{
-		state.Splits[3] = state.Splits[2];
-		state.Splits[2] = state.Splits[1];
-		state.Splits[1] = state.Splits[0];
-		state.Splits[0] = state.timeduration;
+		state.SplitsTenths[3] = state.SplitsTenths[2];
+		state.SplitsTenths[2] = state.SplitsTenths[1];
+		state.SplitsTenths[1] = state.SplitsTenths[0];
+		state.SplitsTenths[0] = GameMinutesTenths;
 		SplitStrings[3] = SplitStrings[2];
 		SplitStrings[2] = SplitStrings[1];
 		SplitStrings[1] = SplitStrings[0];
 		SplitStrings[0] = TimerString;
-		InvalidateRect(hMainWindow, nullptr, true);
+		Timerproc(0, 0, 0, 0);
 		if (state.b_Sound)
 			PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK2), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
 	}
@@ -274,10 +280,10 @@ void Split()
 
 void resetSplits()
 {
-	state.Splits[3] = {};
-	state.Splits[2] = {};
-	state.Splits[1] = {};
-	state.Splits[0] = {};
+	state.SplitsTenths[3] = {};
+	state.SplitsTenths[2] = {};
+	state.SplitsTenths[1] = {};
+	state.SplitsTenths[0] = {};
 	for (int i = 0; i < 4; i++)
 	{
 		SplitStrings[i] = GetTimeString(GetTenths({}));
@@ -344,7 +350,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	hwndSplitButton = CreateWindowW(
 		L"BUTTON",  // Predefined class; Unicode assumed 
-		L"'L' Split",      // Button text 
+		L"'Space' Split",      // Button text 
 		WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
 		x3,         // x position 
 		100,         // y position 
@@ -412,7 +418,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	for (int i = 0; i < 4; i++)
 	{
-		SplitStrings[i] = GetTimeString(GetTenths(std::chrono::duration_cast<std::chrono::milliseconds>(state.Splits[i])));
+		SplitStrings[i] = GetTimeString(state.SplitsTenths[i]);
 	}
 	ToggleSound(hMainWindow);
 	return TRUE;
@@ -438,9 +444,18 @@ void ToggleStopWatch()
 
 void ResetStopWatch()
 {
+	resetSplits();
+	if (state.b_StartedState)
+	{
+		state.b_StartedState = false;
+		state.timebegin = std::chrono::system_clock::now();
+		PauseTimer();
+	}
+	GameMinutesTenths = 0;
 	state.AddedTime = {};
 	state.timebegin = std::chrono::system_clock::now();
 	state.Previoustimeduration = {};
+	TimeSinceLastSplitString = GetTimeString(TimeFormated({}));
 	TimerString = GetTimeString(TimeFormated({}));
 	InvalidateRect(hMainWindow, nullptr, true);
 	if (state.b_Sound)
@@ -499,6 +514,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			break;
 		case IDM_ADDMINUTEBUTTON:
 		{
+			SetFocus(hMainWindow);
 			state.AddedTime += UINT(state.addminutes * 10);
 			Timerproc(0, 0, 0, 0);
 			if (state.b_Sound)
@@ -507,6 +523,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 		case IDM_ADDHOURBUTTON:
 		{
+			SetFocus(hMainWindow);
 			state.AddedTime += UINT(state.addhours * 600);
 			Timerproc(0, 0, 0, 0);
 			if (state.b_Sound)
@@ -542,11 +559,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(hWnd, &ps);
+		SelectObject(hdc, splitfont);
+		TextOutW(hdc, 35, 18, TimerString.c_str(), (int)TimerString.size());
 		SelectObject(hdc, myfont1);
-		TextOutW(hdc, 35, 36, TimerString.c_str(), (int)TimerString.size());
+		TextOutW(hdc, 35, 54, TimeSinceLastSplitString.c_str(), (int)TimeSinceLastSplitString.size());
+		SelectObject(hdc, splitfont);
 		for (int i = 0; i < 4; i++)
 		{
-			SelectObject(hdc, splitfont);
 			TextOutW(hdc, x2 + buttonWidth, 10 + i * 22, SplitStrings[i].c_str(), (int)SplitStrings[i].size());
 		}
 		EndPaint(hWnd, &ps);
@@ -574,7 +593,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			InvalidateRect(hMainWindow, nullptr, true);
 		}
 		break;
-		case 0x4C:
+		case VK_SPACE:
 		{
 			Split();
 			InvalidateRect(hMainWindow, nullptr, true);
