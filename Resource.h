@@ -37,6 +37,8 @@
 #define IDM_ADDHOURBUTTON               211
 #define IDC_MINUTEBOX                   212
 #define IDC_HOURBOX                     213
+#define ID_TIMEFORMATDAYS               220
+#define ID_TIMEFORMATHOURS              221
 #define IDC_STATIC                      -1
 
 // Next default values for new objects

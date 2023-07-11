@@ -22,6 +22,8 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    SetHotKey(HWND, UINT, WPARAM, LPARAM);
+void Timerproc(HWND unnamedParam1, UINT unnamedParam2, UINT_PTR unnamedParam3, DWORD unnamedParam4);
+void RecalculateSplitStrings();
 
 struct SavedState
 {
@@ -29,19 +31,20 @@ struct SavedState
 	std::chrono::duration<double> timeduration;;
 	std::chrono::duration<double> Previoustimeduration;
 	INT64 SplitsTenths[4];
+	INT64 AddedTime;
 	INT intervalValue;
-	INT AddedTime;
 	float addminutes;
 	float addhours;
 	BOOL b_StartedState;
 	BOOL b_Sound = true;
+	BOOL b_TimeFormatDays;
 };
 INT64 GameMinutesTenths = {};
 INT64 TimeSinceLastSplit = {};
 SavedState LoadFromFile();
 void SavetoFile(SavedState ss);
 
-int g_window_width = 500;
+int g_window_width = 520;
 int g_window_height = 330;
 int buttonWidth = 120;
 int buttonheight = 50;
@@ -189,23 +192,57 @@ struct TimeFormated
 	INT tenths;
 	INT minutes;
 	INT hours;
+	INT days;
 	TimeFormated(INT64 GameMinutesTenths)
 	{
-		tenths = (GameMinutesTenths % 10);
-		minutes = (GameMinutesTenths % 600) / 10;
-		hours = (INT)(GameMinutesTenths / 600);
+		if (state.b_TimeFormatDays)
+		{
+			tenths = (GameMinutesTenths % 10);
+			minutes = (GameMinutesTenths % 600) / 10;
+			hours = (INT)((GameMinutesTenths / 600) % 24);
+			days = (INT)(GameMinutesTenths / 14400);
+		}
+		else
+		{
+			tenths = (GameMinutesTenths % 10);
+			minutes = (GameMinutesTenths % 600) / 10;
+			hours = (INT)(GameMinutesTenths / 600);
+			days = 0;
+		}
 	}
 };
 
 std::wstring GetTimeString(TimeFormated timeformatted)
 {
+	std::wstring wsdays = L"";
+	if (timeformatted.days > 0)
+	{
+		wsdays = std::to_wstring(timeformatted.days) + ((timeformatted.days == 1) ? L"day " : L"days ");
+	}
 	std::wstring wshours = L"";
 	if (timeformatted.hours > 0)
 	{
-		wshours = std::to_wstring(timeformatted.hours) + ((timeformatted.hours == 1) ? L" hour " : L" hours ");
+		wshours = std::to_wstring(timeformatted.hours) + ((timeformatted.hours == 1) ? L"h " : L"h ");
 	}
 	std::wstring wsminutues = std::to_wstring(timeformatted.minutes);
-	return wshours + L" " + wsminutues + L"." + std::to_wstring(timeformatted.tenths) + L" m";
+	return wsdays + L" " + wshours + L" " + wsminutues + L"." + std::to_wstring(timeformatted.tenths) + L"m";
+}
+
+void SetTimeformat(HWND wnd)
+{
+	if (state.b_TimeFormatDays)
+
+	{
+		ModifyMenuW(GetMenu(wnd), ID_TIMEFORMATDAYS, MF_BYCOMMAND | MF_CHECKED, ID_TIMEFORMATDAYS, L"&Days and Hours");
+		ModifyMenuW(GetMenu(wnd), ID_TIMEFORMATHOURS, MF_BYCOMMAND | MF_UNCHECKED, ID_TIMEFORMATHOURS, L"&Hours");
+	}
+	else
+	{
+		ModifyMenuW(GetMenu(wnd), ID_TIMEFORMATDAYS, MF_BYCOMMAND | MF_UNCHECKED, ID_TIMEFORMATDAYS, L"&Days and Hours");
+		ModifyMenuW(GetMenu(wnd), ID_TIMEFORMATHOURS, MF_BYCOMMAND | MF_CHECKED, ID_TIMEFORMATHOURS, L"&Hours");
+	}
+	RecalculateSplitStrings();
+	Timerproc(0, 0, 0, 0);
 }
 
 INT64 GetTenths(std::chrono::milliseconds ms)
@@ -242,7 +279,8 @@ void Timerproc(HWND unnamedParam1, UINT unnamedParam2, UINT_PTR unnamedParam3, D
 
 	if (state.intervalValue > 0 && TimeSinceLastSplitMinutes != 0 && TimeSinceLastSplitMinutes % state.intervalValue == 0 && TimeSinceLastSplitMinutes != LastGameMinutes && TimeSinceLastSplit % 10 == 0)
 	{
-		PlaySound(MAKEINTRESOURCE(IDSOUNDALARM), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+		if (state.b_StartedState)
+			PlaySound(MAKEINTRESOURCE(IDSOUNDALARM), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
 		LastGameMinutes = TimeSinceLastSplitMinutes;
 	}
 	TimeSinceLastSplitString = GetTimeString(timeformattedLastSplit);
@@ -265,6 +303,14 @@ void PauseTimer()
 	SetDlgItemText(hMainWindow, IDM_STARTBUTTON, L"'P' Start");
 	state.Previoustimeduration = state.timeduration;
 	KillTimer(hMainWindow, IDT_TIMER1);
+}
+
+void RecalculateSplitStrings()
+{
+	SplitStrings[3] = GetTimeString(TimeFormated(state.SplitsTenths[3]));
+	SplitStrings[2] = GetTimeString(TimeFormated(state.SplitsTenths[2]));
+	SplitStrings[1] = GetTimeString(TimeFormated(state.SplitsTenths[1]));
+	SplitStrings[0] = GetTimeString(TimeFormated(state.SplitsTenths[0]));
 }
 
 void Split()
@@ -434,6 +480,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		SplitStrings[i] = GetTimeString(state.SplitsTenths[i]);
 	}
 	ToggleSound(hMainWindow);
+	SetTimeformat(hMainWindow);
 	return TRUE;
 }
 
@@ -530,7 +577,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case IDM_ADDMINUTEBUTTON:
 		{
 			SetFocus(hMainWindow);
-			state.AddedTime += INT(state.addminutes * 10);
+			state.AddedTime += INT64(state.addminutes * 10.0);
 			Timerproc(0, 0, 0, 0);
 			if (state.b_Sound)
 				PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK2), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
@@ -539,7 +586,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case IDM_ADDHOURBUTTON:
 		{
 			SetFocus(hMainWindow);
-			state.AddedTime += INT(state.addhours * 600);
+			state.AddedTime += INT64(state.addhours * 600.0);
 			Timerproc(0, 0, 0, 0);
 			if (state.b_Sound)
 				PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK3), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
@@ -565,11 +612,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				ss >> state.addhours;
 			}
 			break;
+		case ID_TIMEFORMATDAYS:
+			state.b_TimeFormatDays = TRUE;
+			SetTimeformat(hMainWindow);
+			break;
+		case ID_TIMEFORMATHOURS:
+			state.b_TimeFormatDays = FALSE;
+			SetTimeformat(hMainWindow);
+			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
 	}
 	break;
+	case WM_LBUTTONDOWN:
+		SetFocus(hMainWindow);
+		break;
 	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
