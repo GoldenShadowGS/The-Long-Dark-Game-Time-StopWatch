@@ -37,6 +37,7 @@ struct SavedState
 	float addhours;
 	BOOL b_StartedState;
 	BOOL b_Sound = true;
+	BOOL b_Bwoop;
 	BOOL b_TimeFormatDays;
 };
 INT64 GameMinutesTenths = {};
@@ -280,7 +281,12 @@ void Timerproc(HWND unnamedParam1, UINT unnamedParam2, UINT_PTR unnamedParam3, D
 	if (state.intervalValue > 0 && TimeSinceLastSplitMinutes != 0 && TimeSinceLastSplitMinutes % state.intervalValue == 0 && TimeSinceLastSplitMinutes != LastGameMinutes && TimeSinceLastSplit % 10 == 0)
 	{
 		if (state.b_StartedState)
-			PlaySound(MAKEINTRESOURCE(IDSOUNDALARM), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+		{
+			if (state.b_Bwoop)
+				PlaySound(MAKEINTRESOURCE(IDSOUNDBWOOP), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+			else
+				PlaySound(MAKEINTRESOURCE(IDSOUNDALARM), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
+		}
 		LastGameMinutes = TimeSinceLastSplitMinutes;
 	}
 	TimeSinceLastSplitString = GetTimeString(timeformattedLastSplit);
@@ -355,6 +361,18 @@ void ToggleSound(HWND wnd)
 	else
 	{
 		ModifyMenuW(GetMenu(wnd), IDM_SOUNDTOGGLE, MF_BYCOMMAND | MF_UNCHECKED, IDM_SOUNDTOGGLE, L"&Enabled");
+	}
+}
+
+void ToggleBwoop(HWND wnd)
+{
+	if (state.b_Bwoop)
+	{
+		ModifyMenuW(GetMenu(wnd), IDSOUNDBWOOP, MF_BYCOMMAND | MF_CHECKED, IDSOUNDBWOOP, L"&Bwoop");
+	}
+	else
+	{
+		ModifyMenuW(GetMenu(wnd), IDSOUNDBWOOP, MF_BYCOMMAND | MF_UNCHECKED, IDSOUNDBWOOP, L"&Bwoop");
 	}
 }
 
@@ -543,6 +561,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				PlaySound(MAKEINTRESOURCE(IDR_SOUNDCLICK1), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
 			}
 			ToggleSound(hMainWindow);
+			break;
+		case IDSOUNDBWOOP:
+			state.b_Bwoop = !state.b_Bwoop;
+			ToggleBwoop(hMainWindow);
 			break;
 		case IDM_EXIT:
 			DestroyWindow(hWnd);
