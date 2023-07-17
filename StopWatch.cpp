@@ -39,6 +39,7 @@ struct SavedState
 	BOOL b_Sound = true;
 	BOOL b_Bwoop;
 	BOOL b_TimeFormatDays;
+	int backgroundColor;
 };
 INT64 GameMinutesTenths = {};
 INT64 TimeSinceLastSplit = {};
@@ -78,6 +79,9 @@ std::wstring SplitStrings[4];
 
 HFONT myfont1 = nullptr;
 HFONT splitfont = {};
+
+HBRUSH whitebrush = nullptr;
+HBRUSH greenbrush = nullptr;
 
 SavedState state = LoadFromFile();
 
@@ -227,6 +231,23 @@ std::wstring GetTimeString(TimeFormated timeformatted)
 	}
 	std::wstring wsminutues = std::to_wstring(timeformatted.minutes);
 	return wsdays + L" " + wshours + L" " + wsminutues + L"." + std::to_wstring(timeformatted.tenths) + L"m";
+}
+
+void SetBackGroundColor(HWND wnd)
+{
+	switch (state.backgroundColor)
+	{
+	case 1:
+		ModifyMenuW(GetMenu(wnd), IDM_COLORWHITE, MF_BYCOMMAND | MF_UNCHECKED, IDM_COLORWHITE, L"&White");
+		ModifyMenuW(GetMenu(wnd), IDM_COLORGREEN, MF_BYCOMMAND | MF_CHECKED, IDM_COLORGREEN, L"&Green");
+		break;
+	default:
+		ModifyMenuW(GetMenu(wnd), IDM_COLORWHITE, MF_BYCOMMAND | MF_CHECKED, IDM_COLORWHITE, L"&White");
+		ModifyMenuW(GetMenu(wnd), IDM_COLORGREEN, MF_BYCOMMAND | MF_UNCHECKED, IDM_COLORGREEN, L"&Green");
+	}
+	RECT clientrect = {};
+	GetClientRect(wnd, &clientrect);
+	InvalidateRect(hMainWindow, &clientrect, true);
 }
 
 void SetTimeformat(HWND wnd)
@@ -483,6 +504,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		(HINSTANCE)GetWindowLongPtr(hMainWindow, GWLP_HINSTANCE),
 		NULL);      // Pointer not needed.
 
+	whitebrush = CreateSolidBrush(RGB(255, 255, 255));
+	greenbrush = CreateSolidBrush(RGB(0, 255, 0));
+
 	if (state.b_StartedState)
 	{
 		StartTimer();
@@ -498,7 +522,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		SplitStrings[i] = GetTimeString(state.SplitsTenths[i]);
 	}
 	ToggleSound(hMainWindow);
+	ToggleBwoop(hMainWindow);
 	SetTimeformat(hMainWindow);
+	SetBackGroundColor(hMainWindow);
 	return TRUE;
 }
 
@@ -642,6 +668,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			state.b_TimeFormatDays = FALSE;
 			SetTimeformat(hMainWindow);
 			break;
+		case IDM_COLORWHITE:
+		{
+			state.backgroundColor = 0;
+			SetBackGroundColor(hMainWindow);
+		}
+		break;
+		case IDM_COLORGREEN:
+		{
+			state.backgroundColor = 1;
+			SetBackGroundColor(hMainWindow);
+		}
+		break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
@@ -654,6 +692,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(hWnd, &ps);
+		SetBkMode(hdc, TRANSPARENT);
 		SelectObject(hdc, splitfont);
 		TextOutW(hdc, 35, 18, TimerString.c_str(), (int)TimerString.size());
 		SelectObject(hdc, myfont1);
@@ -666,10 +705,28 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		EndPaint(hWnd, &ps);
 	}
 	break;
+	case WM_ERASEBKGND:
+	{
+		RECT clientrect = {};
+		GetClientRect(hWnd, &clientrect);
+		switch (state.backgroundColor)
+		{
+		case 1:
+			FillRect((HDC)wParam, &clientrect, greenbrush);
+			break;
+		default:
+			FillRect((HDC)wParam, &clientrect, whitebrush);
+			break;
+		}
+	}
+	return 1;
+	break;
 	case WM_DESTROY:
 		SavetoFile(state);
 		DeleteObject(myfont1);
 		DeleteObject(splitfont);
+		DeleteObject(whitebrush);
+		DeleteObject(greenbrush);
 		PostQuitMessage(0);
 		break;
 	case WM_KEYDOWN:

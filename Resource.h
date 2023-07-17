@@ -40,6 +40,8 @@
 #define ID_TIMEFORMATDAYS               220
 #define ID_TIMEFORMATHOURS              221
 #define IDSOUNDBWOOP                    222
+#define IDM_COLORWHITE                  230
+#define IDM_COLORGREEN                  231
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
